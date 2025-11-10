@@ -1,5 +1,5 @@
---- php-8.1.29-o/ext/libxml/libxml.c
-+++ php-8.1.29/ext/libxml/libxml.c
+--- php-8.1.33-o/ext/libxml/libxml.c
++++ php-8.1.33/ext/libxml/libxml.c
 @@ -483,7 +483,11 @@
  	xmlResetError((xmlErrorPtr) ptr);
  }
@@ -38,8 +38,8 @@
  
  	if (error) {
  		object_init_ex(return_value, libxmlerror_class_entry);
---- php-8.1.29-o/ext/soap/php_sdl.c
-+++ php-8.1.29/ext/soap/php_sdl.c
+--- php-8.1.33-o/ext/soap/php_sdl.c
++++ php-8.1.33/ext/soap/php_sdl.c
 @@ -332,7 +332,7 @@
  	sdl_restore_uri_credentials(ctx);
  

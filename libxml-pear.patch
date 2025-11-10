@@ -1,5 +1,5 @@
---- php-8.3.9/ext/xml/compat.c
-+++ php-8.3.9/ext/xml/compat.c
+--- php-8.3.27/ext/xml/compat.c
++++ php-8.3.27/ext/xml/compat.c
 @@ -375,7 +375,7 @@
  		if (ret == NULL)
  			ret = xmlGetDocEntity(parser->parser->myDoc, name);
