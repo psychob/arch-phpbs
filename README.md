@@ -1,6 +1,8 @@
 ## phpbs
 ### PHP Building system for all PHP versions packages from 5.3 to 8.4
 
+**Note:** Apache and LiteSpeed SAPI modules have been removed. This build system now only produces CLI, CGI, FPM, embed, and phpdbg packages.
+
 #### How to install it? 
 ```
 git clone https://github.com/lamskoy/arch-phpbs.git

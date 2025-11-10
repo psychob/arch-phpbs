@@ -73,17 +73,10 @@ _phpbs_set_vars() {
     ###########################################################################
     # Binary/conf names
     ###########################################################################
-    if ((_phpbase >= 80)); then
-        # No libapache8.so, in PHP8.0+ just libapache etc
-        _suffix_so=''
-    else
-        _suffix_so="${_phpbase::1}";
-    fi
 
     ###########################################################################
     # Paths, names
     ###########################################################################
-    _build_apache_cfg="etc/httpd/conf/extra"
     _build_fpm_name="php-fpm${_phpbase}${_suffix}"
     _build_fpm_service_name="${pkgbase}-fpm"
     _build_icu_src_dir="icu/source"
@@ -103,12 +96,6 @@ _phpbs_set_vars() {
     _build_phpdbg=$((_phpbase >= 56));
     # Timezonedb patches implemented for PHP 5.6+
     _build_system_timezonedb=$((_phpbase >= 56));
-    # LiteSpeed SAPI is enabled differently in PHP < 7.4
-    if ((_phpbase < 74)); then
-        _build_sapi_litespeed="--with-litespeed"
-    else
-        _build_sapi_litespeed="--enable-litespeed"
-    fi
     ###########################################################################
     # PHP Modules: Enable/Disable flags
     # PHP Modules: Shared/Static modes
@@ -190,9 +177,7 @@ _phpbs_set_vars() {
     _build_sapi_ini_cgi="${_build_sapi_ini_cli}"
     _build_sapi_ini_embed="${_build_sapi_ini_cli}"
     _build_sapi_ini_fpm="${_build_sapi_ini_cli}"
-    _build_sapi_ini_apache="${_build_sapi_ini_cli}"
     _build_sapi_ini_phpdbg="${_build_sapi_ini_cli}"
-    _build_sapi_ini_litespeed="${_build_sapi_ini_cli}"
     _build_conf_d="${_build_sapi_ini_cli}/conf.d"
 
     if ((_build_ini_per_sapi)); then
@@ -200,9 +185,7 @@ _phpbs_set_vars() {
         _build_sapi_ini_cgi+="/cgi"
         _build_sapi_ini_embed+="/embed"
         _build_sapi_ini_fpm+="/fpm"
-        _build_sapi_ini_apache+="/apache"
         _build_sapi_ini_phpdbg+="/phpdbg"
-        _build_sapi_ini_litespeed+="/litespeed"
     fi
 
     ###########################################################################
@@ -230,7 +213,6 @@ _phpbs_set_vars() {
         'libedit'
         'smtp-forwarder'
         'pcre'
-        'apache'
         'ncurses'
         'libxcrypt'
         'systemd'
@@ -258,7 +240,6 @@ _phpbs_set_vars() {
     source=(
         "make-tests.patch"
         "php-makefile-patcher.php"
-        "php-apache.conf"
         "pear-config-patcher.php"
     )
     if [[ "${_pkg_custom_source}" != "" ]]; then
@@ -270,9 +251,6 @@ _phpbs_set_vars() {
     if ((_phpbase <= 81)); then
         _patches=('libxml-pear.patch')
     fi
-    if ((_phpbase >= 84)); then
-        _patches+=("apache-php8.4.patch")
-    fi
     if ((_phpbase < 81)); then
         _patches+=("php-libxml.patch")
     fi
@@ -283,9 +261,6 @@ _phpbs_set_vars() {
     fi
     if ((_phpbase >= 74 && _phpbase < 81)); then
         _patches+=("icu-74-php-7.4.patch")
-    fi
-    if ((_phpbase <= 74 && _phpbase >= 70)); then
-        _patches+=("litespeed-phpheader.patch")
     fi
     if ((_phpbase >= 71 && _phpbase <= 73)); then
         _patches+=("php71-phar-names.patch")
@@ -438,7 +413,7 @@ _phpbs_set_vars() {
     _phpextensions_fpm+=" --with-fpm-acl "
 
     # Basic submodules. Cli shoud be first!
-    _subpkg=('cli' 'cgi' 'fpm' 'embed' 'apache' 'litespeed')
+    _subpkg=('cli' 'cgi' 'fpm' 'embed')
     # PEAR should come before PECL!!!
     _subpkg+=('pear' 'pecl')
     if ((_build_phpdbg)); then
@@ -1213,12 +1188,6 @@ prepare() {
     sed -E "s|(include_dir[\t ]*=.*php)|\1${_phpbase}${_suffix}|g" \
         -i scripts/php-config.in
 
-    if ((_phpbase < 84)); then
-        echo "[SED] sapi/apache2handler/config.m4"
-        sed -e '/APACHE_THREADED_MPM=/d' \
-            -i sapi/apache2handler/config.m4
-    fi
-
     echo "[SED] sapi/fpm/Makefile.frag"
     # sed -e 's#php-fpm\$(program_suffix)#php\$(program_suffix)-fpm#'
     sed -e 's/.conf.default/.conf/g' \
@@ -1368,22 +1337,6 @@ build() {
         --disable-phpdbg \
     "
 
-    # litespeed
-    _cflags="${CFLAGS}"
-    export CFLAGS="${CFLAGS} -Wno-error=format-security"
-    _build_sapi "litespeed" "\
-        --sysconfdir=/${_build_sapi_ini_litespeed} \
-        --with-config-file-path=/${_build_sapi_ini_litespeed} \
-        --disable-all \
-        --disable-cgi \
-        --disable-cli \
-        --disable-fpm \
-        --disable-embed \
-        --disable-phpdbg \
-        ${_build_sapi_litespeed} \
-    "
-    export CFLAGS="${_cflags}"
-
     # fpm
     _build_sapi "fpm" "\
         --sysconfdir=/${_build_sapi_ini_fpm} \
@@ -1413,22 +1366,8 @@ build() {
         --enable-embed=shared \
         --enable-fpm \
         ${_phpextensions_fpm} \
-        ${_build_sapi_litespeed} \
     "
     fi
-
-    # apache
-    _build_sapi "apache" "\
-        --disable-all \
-        --disable-cli \
-        --disable-cgi \
-        --disable-fpm \
-        --disable-embed \
-        --disable-phpdbg \
-        --with-apxs2 \
-        --sysconfdir=/${_build_sapi_ini_apache} \
-        --with-config-file-path=/${_build_sapi_ini_apache} \
-    "
 
 }
 
@@ -1594,44 +1533,6 @@ package_php___PHPBASE___-cgi___SUFFIX___() {
 }
 # CGI end
 
-# Apache
-package_php___PHPBASE___-apache___SUFFIX___() {
-    _sapi="apache"
-    _build_mod_php_so="libphp${_suffix_so}.so"
-    _build_mod_php_module="php${_suffix_so}_module"
-    _build_build_php_script_name="php${_suffix_so}-script"
-    _apache_module_conf="${pkgbase}-module.conf"
-    pkgdesc="Apache SAPI for ${pkgbase}"
-    depends=("${pkgbase}=${pkgver}" 'apache')
-    depends+=("${_sapi_depends[@]}")
-    depends+=('libxcrypt');
-    depends+=('ncurses');
-    backup=("${_build_apache_cfg}/${_apache_module_conf}")
-    echo "# End of LoadModule in httpd.conf - see ArchWiki Apache HTTP Server"
-    echo "LoadModule ${_build_mod_php_module} modules/lib${pkgbase}.so"
-    echo "AddHandler ${_build_php_script_name} .php"
-    echo "# End of Include List"
-    echo "Include conf/extra/${_apache_module_conf}"
-
-    pushd "build-${_sapi}"
-    if ((_build_ini_per_sapi)); then
-        backup+=("${_build_sapi_ini_apache}/php.ini")
-        install -d -m755 "${pkgdir}/${_build_sapi_ini_apache}"
-        install -D -m644 "../php-${pkgver}/php.ini-production" "${pkgdir}/${_build_sapi_ini_apache}/php.ini"
-    fi
-    install -D -m755 "libs/${_build_mod_php_so}" "${pkgdir}/usr/lib/httpd/modules/lib${pkgbase}.so"
-    patchelf --set-soname \
-        "lib${pkgbase}.so" \
-        "${pkgdir}/usr/lib/httpd/modules/lib${pkgbase}.so"
-    popd
-
-    install -D -m644 "php-apache.conf" "${pkgdir}/${_build_apache_cfg}/${_apache_module_conf}"
-    echo "[SED] ${pkgdir}/${_build_apache_cfg}/${_apache_module_conf}"
-    sed -e "s#@MODULE@#${_build_mod_php_module}#" \
-        -i "${pkgdir}/${_build_apache_cfg}/${_apache_module_conf}"
-}
-# Apache end
-
 # FPM
 package_php___PHPBASE___-fpm___SUFFIX___() {
     _sapi="fpm"
@@ -1711,30 +1612,6 @@ package_php___PHPBASE___-phpdbg___SUFFIX___() {
     popd
 }
 # phpdbg sapi end
-
-# litespeed sapi
-package_php___PHPBASE___-litespeed___SUFFIX___() {
-    _sapi="litespeed"
-    pkgdesc="LiteSpeed SAPI for ${pkgbase}"
-    depends=("${pkgbase}=${pkgver}")
-    depends+=("${_sapi_depends[@]}")
-    if ((_build_ini_per_sapi)); then
-        pushd "build-${_sapi}"
-    else
-        pushd "build-cli"
-    fi
-    if ((_build_ini_per_sapi)); then
-        install -D -m644 "../php-${pkgver}/php.ini-production" "${pkgdir}/${_build_sapi_ini_cgi}/php.ini"
-        backup=("${_build_sapi_ini_cgi}/php.ini")
-    fi
-    case "${_phpbase}" in
-        *)
-            install -D -m755 sapi/litespeed/php "${pkgdir}/usr/bin/ls${pkgbase}"
-            ;;
-    esac
-    popd
-}
-# litespeed sapi end
 
 ###############################################################################
 # PEAR + PECL
